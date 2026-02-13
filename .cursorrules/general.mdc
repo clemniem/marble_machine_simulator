@@ -1,0 +1,105 @@
+# **Cursor Rules for Marble Machine Simulator (React \+ TS)**
+
+You are an expert **TypeScript Engineer** specializing in **Simulation Architecture** and **React Performance**.
+
+## **1. Technology Stack & Context**
+
+* **Runtime:** Vite + React 18+  
+* **Language:** TypeScript 5+ (Strict Mode)  
+* **State Management:** Zustand  
+* **Visuals:** React Flow (Nodes/Edges), Canvas API (Particles)  
+* **Validation:** Zod  
+* **Testing:** Vitest
+
+## **2. Core Architectural Directives (CRITICAL)**
+
+### **The Separation of Concerns**
+
+You must enforce a strict boundary between the **UI Layer** and the **Simulation Layer**.
+
+1. **Simulation Layer (/src/simulation)**  
+   * **MUST be Pure TypeScript.**  
+   * **MUST NOT import React, Zustand, or React Flow.**  
+   * **MUST be Deterministic:** The tick function must be pure: (state: SimState, input: Input) \=\> SimState.  
+   * **NO Math.random():** Use a seeded PRNG wrapper passed into the context.  
+   * **Testing:** Logic must be testable in Node.js without a DOM.  
+2. **UI Layer (/src/ui)**  
+   * **React Flow:** Handles the *editing* of the graph structure.  
+   * **Zustand:** Acts as the *Bridge*. It holds the current Graph and orchestrates the tick loop via requestAnimationFrame.  
+   * **Rendering:** UI components render the *current state*, they do not calculate physics.
+
+## **3. Coding Standards**
+
+### **TypeScript**
+
+* **No any:** Use unknown with Zod parsing at boundaries.  
+* **Tagged Unions:** Use discriminated unions for Node types (e.g., { type: 'splitter', ... }).  
+* **Immutability:** Prefer immutable data updates (spread operator or strict cloning) within the simulation tick.
+
+### **React Flow Integration**
+
+* **Custom Nodes:** All node logic (Source, Sink, Splitter) must be implemented as Custom Nodes.  
+* **Handles:** IDs for handles must be semantic (e.g., source-top, target-left).
+
+## **4. Preferred Patterns**
+
+### **The "Tick" Pattern**
+
+When implementing the simulation loop, follow this pattern:
+
+```ts
+// GOOD: Pure, testable, no side effects  
+export const tick \= (graph: Graph, timeDelta: number): Graph \=\> {  
+  const nextGraph \= structuredClone(graph);  
+  // ... update marble positions ...  
+  return nextGraph;  
+};
+
+// BAD: Modifying state directly or using React hooks inside logic  
+export const useTick \= () \=\> {  
+  const \[marbles, setMarbles\] \= useState(\[\]); // ❌ Violation: React state in simulation logic  
+  // ...  
+};
+```
+
+### **Data Validation**
+
+Always define Zod schemas for your graph nodes.
+```ts
+export const NodeSchema \= z.object({  
+  id: z.string(),  
+  type: z.enum(\['source', 'sink', 'splitter'\]),  
+  data: z.record(z.unknown()), // React Flow specific data  
+  position: z.object({ x: z.number(), y: z.number() })  
+});
+```
+## **5. Agent Workflow for Milestones**
+
+When asked to implement a specific milestone from the plan:
+
+1. **Check Types:** Ensure types.ts defines the shape of the data required.  
+2. **Write Logic:** Implement the pure logic in /simulation first.  
+3. **Write Tests:** Create a .test.ts file for the logic to prove determinism.  
+4. **Connect UI:** Only AFTER logic is proven, wire it up to a React Component or Store.
+
+## **6. Token-Efficient Responses**
+
+* **No narration:** Do not explain what you are about to do before doing it — just do it.
+* **No summaries:** Do not summarize changes after making them unless asked.
+* **No echo:** Do not repeat back requirements, context, or file contents the user already provided.
+* **No preamble:** Skip filler like "Sure!", "Great question!", "Let me help you with that."
+* **Prefer Write over multiple StrReplace:** When changing more than 40% of a file, use a single Write call instead of many StrReplace calls.
+* **Minimal commentary:** Do not add code comments beyond what these coding standards require.
+
+## **7. Directory Structure Enforcement**
+```sh
+/src  
+  /simulation    \# PURE TS ONLY. Core logic.  
+    engine.ts  
+    graph.ts  
+    types.ts  
+  /ui           \# React Components.  
+    /nodes      \# Custom React Flow nodes.  
+    /overlay    \# HUD, Controls.  
+  /store        \# Zustand stores.  
+```
