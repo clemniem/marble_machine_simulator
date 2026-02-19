@@ -38,3 +38,13 @@ npm run test:watch
 ```
 
 All tests live under `src/**/__tests__/*.test.ts` and use Vitest.
+
+## Troubleshooting
+
+**`npm warn Unknown env config "devdir"`** — This comes from your environment (e.g. Cursor or another tool setting `NPM_CONFIG_DEVDIR`). It’s harmless. To hide it when running npm in your own terminal, run:
+
+```bash
+unset NPM_CONFIG_DEVDIR
+```
+
+before `npm install` / `npm run dev`, or add that line to your shell profile if you want it unset everywhere.

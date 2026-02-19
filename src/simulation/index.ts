@@ -22,3 +22,20 @@ export type {
 } from './types.js';
 
 export { createRng, nextFloat, nextInt } from './rng.js';
+
+export {
+  createEmptyGraph,
+  createNode,
+  createEdge,
+  buildSimGraph,
+  validateDAG,
+  computeEdgeLengths,
+  addNode,
+  removeNode,
+  addEdge,
+  removeEdge,
+  resetIdCounters,
+} from './graph.js';
+
+export { tick } from './engine.js';
+export { handlers, resetMarbleCounter } from './behaviors.js';
