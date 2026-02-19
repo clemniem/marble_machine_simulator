@@ -1,59 +1,67 @@
-import { useEffect } from 'react';
-import { useGraphStore } from '../store/graphStore.js';
+import { ReactFlowProvider } from '@xyflow/react';
+import FlowEditor from './editor/FlowEditor.js';
+import NodePalette from './editor/NodePalette.js';
 import { useSimulationStore } from '../store/simulationStore.js';
 
-/**
- * Minimal app shell for M3 verification.
- * Seeds a hardcoded source -> sink graph and exposes
- * play/pause/step/reset controls to prove the tick loop works.
- */
 export default function App() {
-  const { nodes, addNode } = useGraphStore();
-  const { status, simState, start, pause, step, reset } = useSimulationStore();
-
-  useEffect(() => {
-    if (nodes.length > 0) return;
-    // Seed a hardcoded graph: source -> sink
-    const graphStore = useGraphStore.getState();
-    graphStore.addNode('source', { x: 0, y: 0 });
-    graphStore.addNode('sink', { x: 200, y: 0 });
-
-    const currentNodes = useGraphStore.getState().nodes;
-    const srcId = currentNodes[0]?.id;
-    const sinkId = currentNodes[1]?.id;
-    if (srcId && sinkId) {
-      useGraphStore.setState((s) => ({
-        edges: [
-          ...s.edges,
-          {
-            id: 'edge-init',
-            source: srcId,
-            target: sinkId,
-            sourceHandle: 'output',
-            targetHandle: 'input',
-          },
-        ],
-      }));
-    }
-  }, [nodes.length, addNode]);
+  const { status, simState, speedMultiplier, start, pause, step, reset, setSpeed } = useSimulationStore();
 
   const marbleCount = simState?.marbles.length ?? 0;
   const tickCount = simState?.tickCount ?? 0;
-  const sinkNode = simState
-    ? [...simState.graph.nodes.values()].find((n) => n.type === 'sink')
-    : null;
-  const consumed = sinkNode?.type === 'sink' ? sinkNode.consumed : 0;
+  const sinkNodes = simState
+    ? [...simState.graph.nodes.values()].filter((n) => n.type === 'sink')
+    : [];
+  const consumed = sinkNodes.reduce(
+    (sum, n) => sum + (n.type === 'sink' ? n.consumed : 0),
+    0,
+  );
 
   return (
-    <div style={{ padding: 24, fontFamily: 'monospace' }}>
-      <h1>Marble Machine Simulator</h1>
-      <p>Status: <strong>{status}</strong></p>
-      <p>Tick: {tickCount} | Marbles: {marbleCount} | Consumed: {consumed}</p>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={start} disabled={status === 'running'}>Play</button>
-        <button onClick={pause} disabled={status !== 'running'}>Pause</button>
-        <button onClick={step} disabled={status === 'running'}>Step</button>
-        <button onClick={reset}>Reset</button>
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* HUD bar */}
+      <div style={{
+        padding: '8px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        borderBottom: '1px solid #e5e7eb',
+        background: '#fff',
+        fontFamily: 'monospace',
+        fontSize: 13,
+        flexShrink: 0,
+      }}>
+        <strong style={{ fontSize: 15 }}>Marble Machine</strong>
+        <span>Status: <strong>{status}</strong></span>
+        <span>Tick: {tickCount}</span>
+        <span>Marbles: {marbleCount}</span>
+        <span>Consumed: {consumed}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            Speed:
+            <input
+              type="range"
+              min={0.1}
+              max={2}
+              step={0.1}
+              value={speedMultiplier}
+              onChange={(e) => setSpeed(Number(e.target.value))}
+              style={{ width: 80 }}
+            />
+            <span style={{ minWidth: 32 }}>{speedMultiplier}×</span>
+          </label>
+          <button onClick={start} disabled={status === 'running'}>Play</button>
+          <button onClick={pause} disabled={status !== 'running'}>Pause</button>
+          <button onClick={step} disabled={status === 'running'}>Step</button>
+          <button onClick={reset}>Reset</button>
+        </div>
+      </div>
+
+      {/* Editor area */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <NodePalette />
+        <ReactFlowProvider>
+          <FlowEditor />
+        </ReactFlowProvider>
       </div>
     </div>
   );

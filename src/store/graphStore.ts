@@ -53,7 +53,7 @@ export interface GraphState {
 // RF node -> SimNode conversion
 // ---------------------------------------------------------------------------
 
-let nodeIdCounter = 0;
+let nodeIdCounter = 2;
 
 function rfNodeToSimNode(rfNode: RFNode): SimNode {
   const base = {
@@ -108,9 +108,18 @@ function rfEdgeToSimEdge(rfEdge: RFEdge): SimEdge {
 // Store
 // ---------------------------------------------------------------------------
 
+const DEFAULT_NODES: RFNode[] = [
+  { id: 'source-1', type: 'source', position: { x: 100, y: 200 }, data: { label: 'source' } },
+  { id: 'sink-1', type: 'sink', position: { x: 450, y: 200 }, data: { label: 'sink' } },
+];
+
+const DEFAULT_EDGES: RFEdge[] = [
+  { id: 'edge-default-1', source: 'source-1', target: 'sink-1' },
+];
+
 export const useGraphStore = create<GraphState>((set, get) => ({
-  nodes: [],
-  edges: [],
+  nodes: DEFAULT_NODES,
+  edges: DEFAULT_EDGES,
 
   onNodesChange: (changes) => {
     set((state) => ({ nodes: applyNodeChanges(changes, state.nodes) }));

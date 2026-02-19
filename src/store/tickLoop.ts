@@ -47,7 +47,8 @@ function loop(timestamp: number): void {
     return;
   }
 
-  const frameTime = Math.min((timestamp - lastTime) / 1000, MAX_ACCUMULATOR);
+  const raw = (timestamp - lastTime) / 1000;
+  const frameTime = Math.min(raw * store.speedMultiplier, MAX_ACCUMULATOR);
   lastTime = timestamp;
   accumulator += frameTime;
 

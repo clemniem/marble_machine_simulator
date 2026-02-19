@@ -24,17 +24,15 @@ export interface SimulationState {
   simState: SimState | null;
   prevState: SimState | null;
   interpolationAlpha: number;
-  /** Start or resume the simulation. */
+  /** 0.25× – 5× speed multiplier applied to the tick loop. */
+  speedMultiplier: number;
   start: () => void;
-  /** Pause without resetting. */
   pause: () => void;
-  /** Stop and discard simulation state. */
   reset: () => void;
-  /** Advance exactly one tick (for debugging). */
   step: () => void;
+  setSpeed: (multiplier: number) => void;
   /** Called by the tick loop — not for external use. */
   _tick: () => void;
-  /** Called by the tick loop to set interpolation alpha. */
   _setAlpha: (alpha: number) => void;
 }
 
@@ -61,6 +59,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   simState: null,
   prevState: null,
   interpolationAlpha: 0,
+  speedMultiplier: 1,
 
   start: () => {
     const { status } = get();
@@ -110,6 +109,10 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     const prev = simState;
     const next = tick(simState);
     set({ simState: next, prevState: prev });
+  },
+
+  setSpeed: (multiplier) => {
+    set({ speedMultiplier: Math.max(0.1, Math.min(2, multiplier)) });
   },
 
   _setAlpha: (alpha) => {
