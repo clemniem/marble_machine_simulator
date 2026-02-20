@@ -39,3 +39,11 @@ export {
 
 export { tick } from './engine.js';
 export { handlers, resetMarbleCounter } from './behaviors.js';
+
+export {
+  serializeGraph,
+  deserializeGraph,
+  type SerializedGraph,
+  type DeserializeResult,
+  type DeserializeError,
+} from './persistence.js';

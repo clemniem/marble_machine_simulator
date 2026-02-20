@@ -1,8 +1,24 @@
+import { useRef } from 'react';
 import { useSimulationStore } from '../../store/simulationStore.js';
+import { useGraphStore } from '../../store/graphStore.js';
+
+function downloadFile(content: string, filename: string): void {
+  const blob = new Blob([content], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function HUD() {
   const { status, simState, speedMultiplier, start, pause, step, reset, setSpeed } =
     useSimulationStore();
+  const exportJSON = useGraphStore((s) => s.exportJSON);
+  const importJSON = useGraphStore((s) => s.importJSON);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const marbleCount = simState?.marbles.length ?? 0;
   const tickCount = simState?.tickCount ?? 0;
@@ -12,6 +28,34 @@ export default function HUD() {
         0,
       )
     : 0;
+
+  const handleExport = () => {
+    downloadFile(exportJSON(), 'marble-machine.json');
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const err = importJSON(text);
+      if (err) {
+        alert(`Import failed: ${err}`);
+      }
+      // Reset simulation since the graph changed
+      useSimulationStore.getState().reset();
+    };
+    reader.readAsText(file);
+
+    // Reset input so the same file can be re-imported
+    e.target.value = '';
+  };
 
   return (
     <div
@@ -49,6 +93,9 @@ export default function HUD() {
           />
           <span style={{ minWidth: 32 }}>{speedMultiplier}×</span>
         </label>
+
+        <span style={{ borderLeft: '1px solid #e5e7eb', height: 20 }} />
+
         <button onClick={start} disabled={status === 'running'}>
           Play
         </button>
@@ -59,6 +106,18 @@ export default function HUD() {
           Step
         </button>
         <button onClick={reset}>Reset</button>
+
+        <span style={{ borderLeft: '1px solid #e5e7eb', height: 20 }} />
+
+        <button onClick={handleExport}>Export</button>
+        <button onClick={handleImport}>Import</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
       </div>
     </div>
   );
