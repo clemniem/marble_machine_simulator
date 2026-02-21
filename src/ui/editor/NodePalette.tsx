@@ -9,6 +9,10 @@ const NODE_TYPES: Array<{ type: SimNodeType; label: string; color: string }> = [
   { type: 'ramp', label: 'Ramp', color: '#f59e0b' },
   { type: 'gate', label: 'Gate', color: '#6b7280' },
   { type: 'bucket', label: 'Bucket', color: '#0ea5e9' },
+  { type: 'basin', label: 'Basin', color: '#78716c' },
+  { type: 'colorSplitter', label: 'Color Split', color: '#8b5cf6' },
+  { type: 'signalBuffer', label: 'Buffer', color: '#0d9488' },
+  { type: 'canvas', label: 'Canvas', color: '#1e1b4b' },
 ];
 
 export default function NodePalette() {

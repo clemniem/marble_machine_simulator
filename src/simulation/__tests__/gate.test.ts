@@ -13,8 +13,9 @@ function makeGateGraph(
     id: 'src',
     type: 'source',
     position: { x: 0, y: 0 },
-    spawnRate: 60, // 1 per tick
+    spawnRate: 60,
     spawnCooldown: 1,
+    marbleColor: 'white',
   };
 
   const gate: GateNode = {
@@ -42,7 +43,7 @@ function makeGateGraph(
   const graph = computeEdgeLengths(buildSimGraph(nodes, edges));
 
   return {
-    state: { graph, marbles: [], tickCount: 0, rng: createRng(42) },
+    state: { graph, marbles: [], tickCount: 0, rng: createRng(42), targetImage: null, controllerCode: '', controllerError: null },
     gateId: 'gate',
     edgeToGate: 'e1',
     edgeFromGate: 'e2',
@@ -158,7 +159,7 @@ describe('Gate node', () => {
       // Accumulate marbles
       let s = runTicks(state, 80);
       const gate = s.graph.nodes.get(gateId) as GateNode;
-      const heldOrder = [...gate.heldMarbles];
+      const heldOrder = gate.heldMarbles.map((h) => h.id);
       expect(heldOrder.length).toBeGreaterThan(1);
 
       // Open and tick
@@ -166,14 +167,10 @@ describe('Gate node', () => {
       (cloned.graph.nodes.get(gateId) as GateNode).isOpen = true;
       s = tick(cloned);
 
-      // The released marbles should be on the output edge
       const releasedOnE2 = s.marbles
         .filter((m) => m.edgeId === 'e2' && m.progress === 0)
         .map((m) => m.id);
 
-      // All previously held marbles should appear in FIFO order at the
-      // start of the released list. An additional in-flight marble may
-      // arrive and get released in the same tick (appended at the end).
       for (let i = 0; i < heldOrder.length; i++) {
         expect(releasedOnE2[i]).toBe(heldOrder[i]);
       }

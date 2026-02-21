@@ -14,8 +14,9 @@ function makeBucketGraph(
     id: 'src',
     type: 'source',
     position: { x: 0, y: 0 },
-    spawnRate: 60, // 1 per tick
+    spawnRate: 60,
     spawnCooldown: 1,
+    marbleColor: 'white',
   };
 
   const bucket: BucketNode = {
@@ -43,7 +44,7 @@ function makeBucketGraph(
   const graph = computeEdgeLengths(buildSimGraph(nodes, edges));
 
   return {
-    state: { graph, marbles: [], tickCount: 0, rng: createRng(42) },
+    state: { graph, marbles: [], tickCount: 0, rng: createRng(42), targetImage: null, controllerCode: '', controllerError: null },
     bucketId: 'bucket',
   };
 }

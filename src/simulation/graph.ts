@@ -16,7 +16,10 @@ import type {
   SimEdge,
   SimGraph,
   ValidationResult,
+  MarbleColor,
 } from './types.js';
+import { MARBLE_COLORS } from './types.js';
+import { createEmptyGrid } from './canvas-fill.js';
 
 // ---------------------------------------------------------------------------
 // Empty graph
@@ -62,6 +65,18 @@ export function createNode<T extends SimNodeType>(
 ): Extract<SimNode, { type: T }> {
   const id = generateNodeId(type);
 
+  const emptyContents = (): Record<MarbleColor, number> => {
+    const c: Partial<Record<MarbleColor, number>> = {};
+    for (const color of MARBLE_COLORS) c[color] = 0;
+    return c as Record<MarbleColor, number>;
+  };
+
+  const defaultOutputMap = (): Record<MarbleColor, string> => {
+    const m: Partial<Record<MarbleColor, string>> = {};
+    for (const color of MARBLE_COLORS) m[color] = `output-${color}`;
+    return m as Record<MarbleColor, string>;
+  };
+
   const defaults: Record<SimNodeType, () => SimNode> = {
     source: () => ({
       id,
@@ -69,6 +84,7 @@ export function createNode<T extends SimNodeType>(
       position,
       spawnRate: DEFAULT_SPAWN_RATE,
       spawnCooldown: Math.round(TICK_RATE / DEFAULT_SPAWN_RATE),
+      marbleColor: 'white' as const,
     }),
     sink: () => ({
       id,
@@ -109,6 +125,40 @@ export function createNode<T extends SimNodeType>(
       capacity: 5,
       currentFill: 0,
       releaseMode: 'all' as const,
+    }),
+    basin: () => ({
+      id,
+      type: 'basin' as const,
+      position,
+      contents: emptyContents(),
+      extractionMode: 'active' as const,
+      extractRate: 10,
+      extractCooldown: 10,
+      extractColor: null,
+    }),
+    colorSplitter: () => ({
+      id,
+      type: 'colorSplitter' as const,
+      position,
+      outputMap: defaultOutputMap(),
+    }),
+    signalBuffer: () => ({
+      id,
+      type: 'signalBuffer' as const,
+      position,
+      heldMarbles: [],
+      releaseCount: 0,
+      maxCapacity: 50,
+    }),
+    canvas: () => ({
+      id,
+      type: 'canvas' as const,
+      position,
+      width: 16,
+      height: 16,
+      fillPattern: 'left-to-right' as const,
+      grid: createEmptyGrid(16, 16),
+      cursor: 0,
     }),
   };
 

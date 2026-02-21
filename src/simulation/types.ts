@@ -15,6 +15,16 @@ export type EdgeId = string;
 export type MarbleId = string;
 
 // ---------------------------------------------------------------------------
+// Marble colors — fixed palette matching the physical machine's bead set
+// ---------------------------------------------------------------------------
+
+export const MARBLE_COLORS = [
+  'red', 'blue', 'green', 'yellow', 'black', 'white', 'orange', 'purple',
+] as const;
+
+export type MarbleColor = (typeof MARBLE_COLORS)[number];
+
+// ---------------------------------------------------------------------------
 // Position
 // ---------------------------------------------------------------------------
 
@@ -34,7 +44,11 @@ export type SimNodeType =
   | 'elevator'
   | 'ramp'
   | 'gate'
-  | 'bucket';
+  | 'bucket'
+  | 'basin'
+  | 'colorSplitter'
+  | 'signalBuffer'
+  | 'canvas';
 
 /** Fields shared by every simulation node. */
 export interface SimNodeBase {
@@ -50,6 +64,8 @@ export interface SourceNode extends SimNodeBase {
   readonly spawnRate: number;
   /** Ticks remaining until next spawn (decremented each tick). */
   spawnCooldown: number;
+  /** Color of marbles this source produces. */
+  readonly marbleColor: MarbleColor;
 }
 
 /** Terminal node — absorbs marbles and counts them. */
@@ -74,8 +90,8 @@ export interface ElevatorNode extends SimNodeBase {
   readonly type: 'elevator';
   /** Ticks a marble spends inside the elevator before release. */
   readonly delay: number;
-  /** Marbles currently queued: [marbleId, ticksRemaining]. */
-  queue: Array<{ marbleId: MarbleId; ticksRemaining: number }>;
+  /** Marbles currently queued with color preserved. */
+  queue: Array<{ marbleId: MarbleId; ticksRemaining: number; color: MarbleColor }>;
 }
 
 /** A passive track segment — marbles roll along it affected by gravity. */
@@ -106,11 +122,17 @@ export interface ManualCondition {
 
 export type GateCondition = MarbleCountCondition | TickIntervalCondition | ManualCondition;
 
+/** Marble ID + color pair stored by nodes that hold marbles temporarily. */
+export interface HeldMarble {
+  readonly id: MarbleId;
+  readonly color: MarbleColor;
+}
+
 export interface GateNode extends SimNodeBase {
   readonly type: 'gate';
   condition: GateCondition;
   isOpen: boolean;
-  heldMarbles: MarbleId[];
+  heldMarbles: HeldMarble[];
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +148,56 @@ export interface BucketNode extends SimNodeBase {
   readonly releaseMode: BucketReleaseMode;
 }
 
+// ---------------------------------------------------------------------------
+// Basin — large container holding colored marbles with extraction
+// ---------------------------------------------------------------------------
+
+export type BasinExtractionMode = 'active' | 'passive';
+
+export interface BasinNode extends SimNodeBase {
+  readonly type: 'basin';
+  contents: Record<MarbleColor, number>;
+  readonly extractionMode: BasinExtractionMode;
+  readonly extractRate: number;
+  extractCooldown: number;
+  extractColor: MarbleColor | null;
+}
+
+// ---------------------------------------------------------------------------
+// Color Splitter — routes marbles by color to N outputs
+// ---------------------------------------------------------------------------
+
+export interface ColorSplitterNode extends SimNodeBase {
+  readonly type: 'colorSplitter';
+  readonly outputMap: Record<MarbleColor, string>;
+}
+
+// ---------------------------------------------------------------------------
+// Signal Buffer — controller-triggered release
+// ---------------------------------------------------------------------------
+
+export interface SignalBufferNode extends SimNodeBase {
+  readonly type: 'signalBuffer';
+  heldMarbles: HeldMarble[];
+  releaseCount: number;
+  readonly maxCapacity: number;
+}
+
+// ---------------------------------------------------------------------------
+// Canvas — 2D pixel grid output
+// ---------------------------------------------------------------------------
+
+export type FillPattern = 'left-to-right' | 's-shaped' | 'top-to-bottom' | 'spiral';
+
+export interface CanvasNode extends SimNodeBase {
+  readonly type: 'canvas';
+  readonly width: number;
+  readonly height: number;
+  readonly fillPattern: FillPattern;
+  grid: (MarbleColor | null)[][];
+  cursor: number;
+}
+
 /** Discriminated union of all simulation node types. */
 export type SimNode =
   | SourceNode
@@ -134,7 +206,11 @@ export type SimNode =
   | ElevatorNode
   | RampNode
   | GateNode
-  | BucketNode;
+  | BucketNode
+  | BasinNode
+  | ColorSplitterNode
+  | SignalBufferNode
+  | CanvasNode;
 
 // ---------------------------------------------------------------------------
 // Edges
@@ -173,6 +249,8 @@ export interface Marble {
   progress: number;
   /** Progress units per tick. */
   speed: number;
+  /** Marble color from the fixed palette. */
+  readonly color: MarbleColor;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +278,32 @@ export interface SimGraph {
 }
 
 // ---------------------------------------------------------------------------
+// Pixel image — target for the canvas module
+// ---------------------------------------------------------------------------
+
+export interface PixelImage {
+  readonly width: number;
+  readonly height: number;
+  readonly palette: MarbleColor[];
+  readonly pixels: MarbleColor[][];
+}
+
+// ---------------------------------------------------------------------------
+// Metrics — optimization tracking
+// ---------------------------------------------------------------------------
+
+export interface SimMetrics {
+  totalTicks: number;
+  canvasCompletion: number;
+  moduleCount: Record<string, number>;
+  totalMarbleDistance: number;
+  marblesInTransit: number;
+  marblesInBasins: number;
+  marblesInBuffers: number;
+  colorAccuracy: number;
+}
+
+// ---------------------------------------------------------------------------
 // Top-level simulation state
 // ---------------------------------------------------------------------------
 
@@ -208,6 +312,9 @@ export interface SimState {
   readonly marbles: Marble[];
   tickCount: number;
   rng: SeededRNG;
+  targetImage: PixelImage | null;
+  controllerCode: string;
+  controllerError: string | null;
 }
 
 // ---------------------------------------------------------------------------

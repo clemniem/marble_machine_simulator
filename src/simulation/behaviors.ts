@@ -21,22 +21,25 @@ import type {
   ElevatorNode,
   GateNode,
   BucketNode,
+  BasinNode,
+  ColorSplitterNode,
+  SignalBufferNode,
+  CanvasNode,
   EdgeId,
   MarbleId,
+  MarbleColor,
 } from './types.js';
 import { nextFloat } from './rng.js';
 import { DEFAULT_MARBLE_SPEED } from '../lib/constants.js';
+import { cursorToGridPosition } from './canvas-fill.js';
 
 // ---------------------------------------------------------------------------
 // Context passed to every handler
 // ---------------------------------------------------------------------------
 
 export interface TickContext {
-  /** Mutable simulation state (already cloned). */
   state: SimState;
-  /** Marbles that arrived at this node (progress >= 1). */
   arrivals: Marble[];
-  /** The node being processed. */
   node: SimNode;
 }
 
@@ -46,11 +49,6 @@ export type NodeHandler = (ctx: TickContext) => void;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Generate a deterministic marble ID from tick count, node ID, and
- * current marble array length. This avoids a global counter and
- * ensures identical states produce identical IDs.
- */
 function generateMarbleId(state: SimState, nodeId: string): MarbleId {
   return `m-${state.tickCount}-${nodeId}-${state.marbles.length}`;
 }
@@ -74,12 +72,14 @@ function spawnMarbleOnEdge(
   state: SimState,
   edgeId: EdgeId,
   nodeId: string,
+  color: MarbleColor = 'white',
 ): void {
   state.marbles.push({
     id: generateMarbleId(state, nodeId),
     edgeId,
     progress: 0,
     speed: DEFAULT_MARBLE_SPEED,
+    color,
   });
 }
 
@@ -97,7 +97,7 @@ function handleSource(ctx: TickContext): void {
 
   mutableNode.spawnCooldown--;
   if (mutableNode.spawnCooldown <= 0) {
-    spawnMarbleOnEdge(ctx.state, edges[0]!.id, node.id);
+    spawnMarbleOnEdge(ctx.state, edges[0]!.id, node.id, mutableNode.marbleColor);
     mutableNode.spawnCooldown = Math.round(60 / mutableNode.spawnRate);
   }
 
@@ -126,7 +126,6 @@ function handleSplitter(ctx: TickContext): void {
   const node = ctx.node as SplitterNode;
   const edges = getOutgoingEdges(ctx.state, node.id);
   if (edges.length < 2) {
-    // If only one outgoing edge, route all marbles there
     for (const marble of ctx.arrivals) {
       if (edges[0]) {
         marble.edgeId = edges[0].id;
@@ -152,7 +151,6 @@ function handleElevator(ctx: TickContext): void {
 
   const edges = getOutgoingEdges(ctx.state, mutableNode.id);
 
-  // Queue arriving marbles
   for (const marble of ctx.arrivals) {
     const idx = ctx.state.marbles.indexOf(marble);
     if (idx !== -1) {
@@ -161,27 +159,28 @@ function handleElevator(ctx: TickContext): void {
     mutableNode.queue.push({
       marbleId: marble.id,
       ticksRemaining: mutableNode.delay,
+      color: marble.color,
     });
   }
 
-  // Tick down queued marbles and release when ready
-  const released: string[] = [];
+  const released: Array<{ id: string; color: MarbleColor }> = [];
   for (const item of mutableNode.queue) {
     item.ticksRemaining--;
     if (item.ticksRemaining <= 0) {
-      released.push(item.marbleId);
+      released.push({ id: item.marbleId, color: item.color });
     }
   }
 
   mutableNode.queue = mutableNode.queue.filter((item) => item.ticksRemaining > 0);
 
   if (edges[0]) {
-    for (const marbleId of released) {
+    for (const { id, color } of released) {
       ctx.state.marbles.push({
-        id: marbleId,
+        id,
         edgeId: edges[0].id,
         progress: 0,
         speed: DEFAULT_MARBLE_SPEED,
+        color,
       });
     }
   }
@@ -204,7 +203,6 @@ function handleGate(ctx: TickContext): void {
   const edges = getOutgoingEdges(ctx.state, mutableNode.id);
   const cond = mutableNode.condition;
 
-  // Evaluate gate condition each tick
   switch (cond.kind) {
     case 'tickInterval':
       mutableNode.isOpen = (ctx.state.tickCount % cond.period) < (cond.period / 2);
@@ -217,30 +215,27 @@ function handleGate(ctx: TickContext): void {
       }
       break;
     case 'manual':
-      // isOpen is only changed externally via the store
       break;
   }
 
-  // Remove arriving marbles from the active list and queue them
   for (const marble of ctx.arrivals) {
     const idx = ctx.state.marbles.indexOf(marble);
     if (idx !== -1) ctx.state.marbles.splice(idx, 1);
-    mutableNode.heldMarbles.push(marble.id);
+    mutableNode.heldMarbles.push({ id: marble.id, color: marble.color });
   }
 
-  // If open, release all held marbles (FIFO) onto the output edge
   if (mutableNode.isOpen && edges[0]) {
-    for (const marbleId of mutableNode.heldMarbles) {
+    for (const held of mutableNode.heldMarbles) {
       ctx.state.marbles.push({
-        id: marbleId,
+        id: held.id,
         edgeId: edges[0].id,
         progress: 0,
         speed: DEFAULT_MARBLE_SPEED,
+        color: held.color,
       });
     }
     mutableNode.heldMarbles = [];
 
-    // For marbleCount mode, close the gate after release
     if (cond.kind === 'marbleCount') {
       mutableNode.isOpen = false;
     }
@@ -253,14 +248,12 @@ function handleBucket(ctx: TickContext): void {
 
   const edges = getOutgoingEdges(ctx.state, mutableNode.id);
 
-  // Absorb arriving marbles
   for (const marble of ctx.arrivals) {
     const idx = ctx.state.marbles.indexOf(marble);
     if (idx !== -1) ctx.state.marbles.splice(idx, 1);
     mutableNode.currentFill++;
   }
 
-  // Check release condition
   if (mutableNode.currentFill >= mutableNode.capacity && edges[0]) {
     if (mutableNode.releaseMode === 'all') {
       for (let i = 0; i < mutableNode.capacity; i++) {
@@ -268,13 +261,139 @@ function handleBucket(ctx: TickContext): void {
       }
       mutableNode.currentFill = 0;
     } else {
-      // overflow mode: release only the excess
       const excess = mutableNode.currentFill - mutableNode.capacity;
       for (let i = 0; i < excess; i++) {
         spawnMarbleOnEdge(ctx.state, edges[0].id, mutableNode.id);
       }
       mutableNode.currentFill = mutableNode.capacity;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// New node handlers for pixel machine expansion
+// ---------------------------------------------------------------------------
+
+function handleBasin(ctx: TickContext): void {
+  const mutableNode = ctx.state.graph.nodes.get(ctx.node.id) as BasinNode | undefined;
+  if (!mutableNode) return;
+
+  const edges = getOutgoingEdges(ctx.state, mutableNode.id);
+
+  // Absorb arriving marbles into contents
+  for (const marble of ctx.arrivals) {
+    const idx = ctx.state.marbles.indexOf(marble);
+    if (idx !== -1) ctx.state.marbles.splice(idx, 1);
+    mutableNode.contents[marble.color] = (mutableNode.contents[marble.color] ?? 0) + 1;
+  }
+
+  if (edges.length === 0) return;
+
+  // Extract marbles based on cooldown
+  mutableNode.extractCooldown--;
+  if (mutableNode.extractCooldown <= 0) {
+    mutableNode.extractCooldown = mutableNode.extractRate;
+
+    const targetColor = mutableNode.extractColor;
+    let colorToExtract: MarbleColor | null = null;
+
+    if (targetColor && (mutableNode.contents[targetColor] ?? 0) > 0) {
+      colorToExtract = targetColor;
+    } else if (!targetColor) {
+      // Extract any available color
+      for (const [c, count] of Object.entries(mutableNode.contents)) {
+        if (count > 0) {
+          colorToExtract = c as MarbleColor;
+          break;
+        }
+      }
+    }
+
+    if (colorToExtract) {
+      mutableNode.contents[colorToExtract] = (mutableNode.contents[colorToExtract] ?? 1) - 1;
+      spawnMarbleOnEdge(ctx.state, edges[0]!.id, mutableNode.id, colorToExtract);
+    }
+  }
+}
+
+function handleColorSplitter(ctx: TickContext): void {
+  const node = ctx.node as ColorSplitterNode;
+  const edges = getOutgoingEdges(ctx.state, node.id);
+
+  const edgeByHandle = new Map<string, SimEdge>();
+  for (const edge of edges) {
+    edgeByHandle.set(edge.fromHandle, edge);
+  }
+
+  for (const marble of ctx.arrivals) {
+    const handleId = node.outputMap[marble.color];
+    const targetEdge = handleId ? edgeByHandle.get(handleId) : undefined;
+
+    if (targetEdge) {
+      marble.edgeId = targetEdge.id;
+      marble.progress = 0;
+    } else {
+      // No matching output — marble is dropped (consumed)
+      const idx = ctx.state.marbles.indexOf(marble);
+      if (idx !== -1) ctx.state.marbles.splice(idx, 1);
+    }
+  }
+}
+
+function handleSignalBuffer(ctx: TickContext): void {
+  const mutableNode = ctx.state.graph.nodes.get(ctx.node.id) as SignalBufferNode | undefined;
+  if (!mutableNode) return;
+
+  const edges = getOutgoingEdges(ctx.state, mutableNode.id);
+
+  for (const marble of ctx.arrivals) {
+    const idx = ctx.state.marbles.indexOf(marble);
+    if (idx !== -1) ctx.state.marbles.splice(idx, 1);
+    if (mutableNode.heldMarbles.length < mutableNode.maxCapacity) {
+      mutableNode.heldMarbles.push({ id: marble.id, color: marble.color });
+    }
+  }
+
+  if (mutableNode.releaseCount > 0 && edges[0]) {
+    const toRelease = Math.min(mutableNode.releaseCount, mutableNode.heldMarbles.length);
+    const released = mutableNode.heldMarbles.splice(0, toRelease);
+    for (const held of released) {
+      ctx.state.marbles.push({
+        id: held.id,
+        edgeId: edges[0].id,
+        progress: 0,
+        speed: DEFAULT_MARBLE_SPEED,
+        color: held.color,
+      });
+    }
+    mutableNode.releaseCount = 0;
+  }
+}
+
+function handleCanvas(ctx: TickContext): void {
+  const mutableNode = ctx.state.graph.nodes.get(ctx.node.id) as CanvasNode | undefined;
+  if (!mutableNode) return;
+
+  const totalCells = mutableNode.width * mutableNode.height;
+
+  for (const marble of ctx.arrivals) {
+    // Remove marble from simulation
+    const idx = ctx.state.marbles.indexOf(marble);
+    if (idx !== -1) ctx.state.marbles.splice(idx, 1);
+
+    if (mutableNode.cursor >= totalCells) continue;
+
+    const { row, col } = cursorToGridPosition(
+      mutableNode.cursor,
+      mutableNode.width,
+      mutableNode.height,
+      mutableNode.fillPattern,
+    );
+
+    if (mutableNode.grid[row]) {
+      mutableNode.grid[row]![col] = marble.color;
+    }
+    mutableNode.cursor++;
   }
 }
 
@@ -290,4 +409,8 @@ export const handlers: Record<SimNodeType, NodeHandler> = {
   ramp: handleRamp,
   gate: handleGate,
   bucket: handleBucket,
+  basin: handleBasin,
+  colorSplitter: handleColorSplitter,
+  signalBuffer: handleSignalBuffer,
+  canvas: handleCanvas,
 };

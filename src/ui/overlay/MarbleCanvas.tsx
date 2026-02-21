@@ -5,9 +5,21 @@ import { useGraphStore } from '../../store/graphStore.js';
 import { lerp, clamp } from '../../lib/math.js';
 import type { Marble, SimState, Position } from '../../simulation/types.js';
 
+import type { MarbleColor } from '../../simulation/types.js';
+
 const MARBLE_RADIUS = 6;
-const MARBLE_COLOR = '#1e293b';
 const MARBLE_BORDER = '#e2e8f0';
+
+const COLOR_MAP: Record<MarbleColor, string> = {
+  red: '#ef4444',
+  blue: '#3b82f6',
+  green: '#22c55e',
+  yellow: '#eab308',
+  black: '#1e293b',
+  white: '#f1f5f9',
+  orange: '#f97316',
+  purple: '#a855f7',
+};
 
 // ---------------------------------------------------------------------------
 // Edge path sampling — follow React Flow's SVG bezier curves
@@ -165,7 +177,6 @@ export default function MarbleCanvas() {
 
       const radius = Math.max(MARBLE_RADIUS * vp.zoom, 3);
 
-      ctx.fillStyle = MARBLE_COLOR;
       ctx.strokeStyle = MARBLE_BORDER;
       ctx.lineWidth = 1.5;
 
@@ -175,7 +186,6 @@ export default function MarbleCanvas() {
 
         let drawPos = curPos;
 
-        // Smooth interpolation between prev and current tick
         if (prevState) {
           const prevMarble = prevState.marbles.find((m) => m.id === marble.id);
           if (prevMarble) {
@@ -189,6 +199,7 @@ export default function MarbleCanvas() {
           }
         }
 
+        ctx.fillStyle = COLOR_MAP[marble.color] ?? '#1e293b';
         ctx.beginPath();
         ctx.arc(drawPos.x, drawPos.y, radius, 0, Math.PI * 2);
         ctx.fill();

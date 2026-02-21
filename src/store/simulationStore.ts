@@ -41,12 +41,16 @@ export interface SimulationState {
 // ---------------------------------------------------------------------------
 
 function initSimState(): SimState {
-  const graph = useGraphStore.getState().toSimGraph();
+  const graphState = useGraphStore.getState();
+  const graph = graphState.toSimGraph();
   return {
     graph,
     marbles: [],
     tickCount: 0,
     rng: createRng(42),
+    targetImage: graphState.targetImage ?? null,
+    controllerCode: graphState.controllerCode ?? '',
+    controllerError: null,
   };
 }
 

@@ -17,6 +17,7 @@ export default function HUD() {
     useSimulationStore();
   const exportJSON = useGraphStore((s) => s.exportJSON);
   const importJSON = useGraphStore((s) => s.importJSON);
+  const loadDemo = useGraphStore((s) => s.loadDemo);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +112,9 @@ export default function HUD() {
 
         <button onClick={handleExport}>Export</button>
         <button onClick={handleImport}>Import</button>
+        <button onClick={() => { loadDemo(); useSimulationStore.getState().reset(); }} style={{ background: '#6366f1', color: '#fff', border: '1px solid #4f46e5', borderRadius: 4, padding: '4px 8px' }}>
+          Demo
+        </button>
         <input
           ref={fileInputRef}
           type="file"

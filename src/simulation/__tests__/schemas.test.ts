@@ -17,6 +17,7 @@ describe('SimNodeSchema', () => {
     position: { x: 0, y: 0 },
     spawnRate: 1,
     spawnCooldown: 60,
+    marbleColor: 'white' as const,
   };
 
   const validSink = {
@@ -74,7 +75,7 @@ describe('SimNodeSchema', () => {
   });
 
   it('rejects node with missing id', () => {
-    expect(() => SimNodeSchema.parse({ type: 'source', position: { x: 0, y: 0 }, spawnRate: 1, spawnCooldown: 0 })).toThrow();
+    expect(() => SimNodeSchema.parse({ type: 'source', position: { x: 0, y: 0 }, spawnRate: 1, spawnCooldown: 0, marbleColor: 'white' })).toThrow();
   });
 
   it('rejects splitter ratio out of range', () => {
@@ -116,6 +117,7 @@ describe('MarbleSchema', () => {
     edgeId: 'edge-1',
     progress: 0.5,
     speed: 0.02,
+    color: 'red' as const,
   };
 
   it('accepts valid marble', () => {

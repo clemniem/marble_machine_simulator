@@ -2,6 +2,7 @@ export type {
   NodeId,
   EdgeId,
   MarbleId,
+  MarbleColor,
   Position,
   SimNodeType,
   SimNodeBase,
@@ -11,6 +12,7 @@ export type {
   ElevatorNode,
   RampNode,
   GateNode,
+  HeldMarble,
   GateCondition,
   GateConditionKind,
   MarbleCountCondition,
@@ -18,16 +20,26 @@ export type {
   ManualCondition,
   BucketNode,
   BucketReleaseMode,
+  BasinNode,
+  BasinExtractionMode,
+  ColorSplitterNode,
+  SignalBufferNode,
+  CanvasNode,
+  FillPattern,
   SimNode,
   SimEdge,
   Marble,
   SeededRNG,
   SimGraph,
+  PixelImage,
+  SimMetrics,
   SimState,
   ValidationResult,
   ValidationSuccess,
   ValidationFailure,
 } from './types.js';
+
+export { MARBLE_COLORS } from './types.js';
 
 export { createRng, nextFloat, nextInt } from './rng.js';
 

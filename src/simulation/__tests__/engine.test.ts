@@ -34,6 +34,9 @@ function buildSimpleState(opts?: { spawnRate?: number; speed?: number }): SimSta
     marbles: [],
     tickCount: 0,
     rng: createRng(42),
+    targetImage: null,
+    controllerCode: '',
+    controllerError: null,
   };
 }
 
@@ -158,7 +161,7 @@ describe('splitter', () => {
       buildSimGraph([src, splitter, sinkL, sinkR], [e1, e2, e3]),
     );
 
-    return { graph, marbles: [], tickCount: 0, rng: createRng(42) };
+    return { graph, marbles: [], tickCount: 0, rng: createRng(42), targetImage: null, controllerCode: '', controllerError: null };
   }
 
   it('routes marbles to both outputs over many ticks', () => {
@@ -227,7 +230,7 @@ describe('elevator', () => {
       buildSimGraph([src, elev, sink], [e1, e2]),
     );
 
-    return { graph, marbles: [], tickCount: 0, rng: createRng(42) };
+    return { graph, marbles: [], tickCount: 0, rng: createRng(42), targetImage: null, controllerCode: '', controllerError: null };
   }
 
   it('delays marbles by the specified tick count', () => {

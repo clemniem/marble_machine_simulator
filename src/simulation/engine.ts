@@ -4,32 +4,26 @@
  * A single pure function advances the world by one tick:
  *   tick(state) => nextState
  *
- * Four phases per tick:
+ * Five phases per tick:
  *   1. advanceMarbles — move existing marbles along their edges
  *   2. processArrivals — handle marbles that reached their destination node
- *   3. spawnMarbles — source nodes emit new marbles on cooldown
- *   4. tickPeriodicNodes — evaluate gate conditions and similar per-tick logic
- *
- * structuredClone ensures immutability: the previous state is preserved
- * for interpolation and the caller never sees mutation.
+ *   3. runController — execute user controller code (commands buffered)
+ *   4. spawnMarbles — source nodes emit new marbles on cooldown
+ *   5. tickPeriodicNodes — evaluate gate/basin conditions
  */
 
 import type { SimState, Marble, NodeId } from './types.js';
 import { handlers } from './behaviors.js';
+import { executeController } from './controller.js';
 import { MAX_MARBLES } from '../lib/constants.js';
 
-/**
- * Deep-clone state and advance one tick.
- *
- * Uses structuredClone for guaranteed immutability. Maps survive
- * structured cloning in all modern JS engines.
- */
 export function tick(state: SimState): SimState {
   const next: SimState = structuredClone(state);
   next.tickCount++;
 
   advanceMarbles(next);
   processArrivals(next);
+  runController(next);
   spawnMarbles(next);
   tickPeriodicNodes(next);
 
@@ -50,7 +44,6 @@ function advanceMarbles(state: SimState): void {
 // Phase 2: Process marbles that arrived at their target node
 // ---------------------------------------------------------------------------
 
-/** Set of node IDs that were already dispatched in processArrivals */
 const processedNodes = new Set<NodeId>();
 
 function processArrivals(state: SimState): void {
@@ -82,7 +75,16 @@ function processArrivals(state: SimState): void {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 3: Source nodes spawn marbles on cooldown
+// Phase 3: Execute user controller code
+// ---------------------------------------------------------------------------
+
+function runController(state: SimState): void {
+  if (!state.controllerCode?.trim()) return;
+  executeController(state);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: Source nodes spawn marbles on cooldown
 // ---------------------------------------------------------------------------
 
 function spawnMarbles(state: SimState): void {
@@ -103,10 +105,10 @@ function spawnMarbles(state: SimState): void {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 4: Tick nodes that need per-tick evaluation (gates, etc.)
+// Phase 5: Tick nodes that need per-tick evaluation
 // ---------------------------------------------------------------------------
 
-const PERIODIC_TYPES = new Set(['gate']);
+const PERIODIC_TYPES = new Set(['gate', 'basin', 'signalBuffer']);
 
 function tickPeriodicNodes(state: SimState): void {
   for (const node of state.graph.nodes.values()) {
