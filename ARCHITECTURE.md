@@ -24,6 +24,13 @@ graph TB
     HUD[HUD / Controls]
   end
 
+  subgraph vizLayer ["Visualization Layer (future)"]
+    VisualNodes[Visual Node Components]
+    VisualEdges[Visual Edge Components]
+    SpriteRenderer[Sprite Marble Renderer]
+    ThemeSystem[Theme System]
+  end
+
   subgraph bridgeLayer [Bridge - Zustand]
     GraphStore[graphStore]
     SimStore[simulationStore]
@@ -47,6 +54,12 @@ graph TB
   SimStore -->|"current marble positions"| CanvasOverlay
   SimStore -->|"stats, status"| HUD
   GraphStore -->|"node/edge data"| ReactFlow
+
+  vizLayer -.->|"swaps into"| uiLayer
+  ThemeSystem -.->|"styles"| VisualNodes
+  ThemeSystem -.->|"styles"| VisualEdges
+  ThemeSystem -.->|"styles"| SpriteRenderer
+  SimStore -.->|"marble positions"| SpriteRenderer
 ```
 
 ---
@@ -333,6 +346,79 @@ Displays: tick count, marble count, simulation speed controls (play/pause/step/r
 ### Persistence Controls — `/src/ui/overlay/PersistenceControls.tsx`
 
 Export (file download) and Import (file picker) buttons for JSON save/load.
+
+---
+
+## Future: Visualization Layer
+
+The current UI renders functional editor components (rectangles, handles, simple canvas circles). A future **Visualization Layer** would allow rich, themed visuals — sprite-based nodes, tube/rail edges, animated marble trails — without modifying the simulation engine or stores. The architecture already supports this; the notes below document the extension points.
+
+### View Mode
+
+A `viewMode: 'editor' | 'visualization'` flag (on a new `uiStore` or on `simulationStore`) controls which component set renders. In editor mode the current simple components are used. In visualization mode an alternate set of themed components takes over. The simulation engine is completely unaware of which view mode is active.
+
+### Swappable Node Components
+
+The `nodeTypes` registry in `src/ui/nodes/nodeTypes.ts` already maps `SimNodeType` to a React component. For the visualization layer, a parallel registry provides sprite-based or themed components:
+
+```typescript
+// src/ui/nodes/nodeTypes.ts (existing)
+export const nodeTypes = { source: SourceNode, sink: SinkNode, /* … */ };
+
+// src/ui/nodes/visualNodeTypes.ts (future)
+export const visualNodeTypes = { source: SourceSprite, sink: SinkSprite, /* … */ };
+```
+
+`FlowEditor.tsx` selects which registry to pass to `<ReactFlow nodeTypes={…}>` based on `viewMode`. Because React Flow resolves node components by key, the swap is seamless — no changes to the graph data or stores are required.
+
+### Custom Edge Components
+
+React Flow supports an `edgeTypes` prop (not yet used in the project). A `visualEdgeTypes` registry would provide custom edge components rendering tubes, rails, or animated paths instead of the default SVG bezier curves:
+
+```typescript
+// src/ui/edges/visualEdgeTypes.ts (future)
+export const visualEdgeTypes = { default: TubeEdge, rail: RailEdge };
+```
+
+The same `viewMode` flag determines whether the default edges or the visual edge components are active. Edge data structures in `graphStore` remain unchanged.
+
+### Marble Renderer Abstraction
+
+`MarbleCanvas.tsx` already separates position calculation (sampling edge paths) from drawing (filling circles on the canvas). To support themed marble visuals, a `MarbleRenderer` interface formalizes this split:
+
+```typescript
+interface MarbleRenderer {
+  draw(ctx: CanvasRenderingContext2D, x: number, y: number, marble: Marble): void;
+}
+
+class CircleRenderer implements MarbleRenderer { /* current behavior */ }
+class SpriteRenderer implements MarbleRenderer { /* sprite sheets, particle trails */ }
+```
+
+`MarbleCanvas` would delegate to the active renderer based on `viewMode`. The position logic stays untouched.
+
+### Theme System
+
+Visual constants (colors, sizes, border radii, shadows) are currently hardcoded in individual node components and `NodePalette.tsx`. When the visualization layer is built, these should be centralized into a `src/ui/theme/` module:
+
+```
+/src/ui/theme/
+  index.ts          # theme context provider + hook
+  editorTheme.ts    # default editor visual constants
+  retroTheme.ts     # example themed visual set
+```
+
+Components would read values from the active theme rather than using inline literals, enabling full visual reskinning without touching component logic.
+
+### Architectural Impact
+
+None of these additions require changes to:
+
+- **Simulation Engine** (`/src/simulation`) — remains pure TS, unaware of rendering.
+- **Zustand Stores** (`/src/store`) — `graphStore` and `simulationStore` continue to manage data; only a `viewMode` flag is added.
+- **Existing node/edge components** — they stay as the "editor" theme; visualization components live alongside them.
+
+The node behavior registry pattern (add a type, add a handler, add a component) extends naturally: for each node type, add a third component in the visual registry.
 
 ---
 
