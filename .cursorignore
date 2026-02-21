@@ -1,0 +1,41 @@
+# Dependencies and lockfile (large, low value for context)
+node_modules/
+package-lock.json
+
+# Build and preview output
+dist/
+dist-ssr/
+*.local
+
+# Git (no need to index repo internals)
+.git/
+
+# Logs and debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test and coverage output
+coverage/
+.nyc_output/
+*.lcov
+
+# Caches (Vite, tooling)
+.vite/
+.cache/
+node_modules/.vite/
+node_modules/.cache/
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
