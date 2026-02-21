@@ -19,6 +19,8 @@ import type {
   SinkNode,
   SplitterNode,
   ElevatorNode,
+  GateNode,
+  BucketNode,
   EdgeId,
   MarbleId,
 } from './types.js';
@@ -195,6 +197,87 @@ function handleRamp(ctx: TickContext): void {
   }
 }
 
+function handleGate(ctx: TickContext): void {
+  const mutableNode = ctx.state.graph.nodes.get(ctx.node.id) as GateNode | undefined;
+  if (!mutableNode) return;
+
+  const edges = getOutgoingEdges(ctx.state, mutableNode.id);
+  const cond = mutableNode.condition;
+
+  // Evaluate gate condition each tick
+  switch (cond.kind) {
+    case 'tickInterval':
+      mutableNode.isOpen = (ctx.state.tickCount % cond.period) < (cond.period / 2);
+      break;
+    case 'marbleCount':
+      cond.arrivedCount += ctx.arrivals.length;
+      if (cond.arrivedCount >= cond.threshold) {
+        mutableNode.isOpen = true;
+        cond.arrivedCount = 0;
+      }
+      break;
+    case 'manual':
+      // isOpen is only changed externally via the store
+      break;
+  }
+
+  // Remove arriving marbles from the active list and queue them
+  for (const marble of ctx.arrivals) {
+    const idx = ctx.state.marbles.indexOf(marble);
+    if (idx !== -1) ctx.state.marbles.splice(idx, 1);
+    mutableNode.heldMarbles.push(marble.id);
+  }
+
+  // If open, release all held marbles (FIFO) onto the output edge
+  if (mutableNode.isOpen && edges[0]) {
+    for (const marbleId of mutableNode.heldMarbles) {
+      ctx.state.marbles.push({
+        id: marbleId,
+        edgeId: edges[0].id,
+        progress: 0,
+        speed: DEFAULT_MARBLE_SPEED,
+      });
+    }
+    mutableNode.heldMarbles = [];
+
+    // For marbleCount mode, close the gate after release
+    if (cond.kind === 'marbleCount') {
+      mutableNode.isOpen = false;
+    }
+  }
+}
+
+function handleBucket(ctx: TickContext): void {
+  const mutableNode = ctx.state.graph.nodes.get(ctx.node.id) as BucketNode | undefined;
+  if (!mutableNode) return;
+
+  const edges = getOutgoingEdges(ctx.state, mutableNode.id);
+
+  // Absorb arriving marbles
+  for (const marble of ctx.arrivals) {
+    const idx = ctx.state.marbles.indexOf(marble);
+    if (idx !== -1) ctx.state.marbles.splice(idx, 1);
+    mutableNode.currentFill++;
+  }
+
+  // Check release condition
+  if (mutableNode.currentFill >= mutableNode.capacity && edges[0]) {
+    if (mutableNode.releaseMode === 'all') {
+      for (let i = 0; i < mutableNode.capacity; i++) {
+        spawnMarbleOnEdge(ctx.state, edges[0].id, mutableNode.id);
+      }
+      mutableNode.currentFill = 0;
+    } else {
+      // overflow mode: release only the excess
+      const excess = mutableNode.currentFill - mutableNode.capacity;
+      for (let i = 0; i < excess; i++) {
+        spawnMarbleOnEdge(ctx.state, edges[0].id, mutableNode.id);
+      }
+      mutableNode.currentFill = mutableNode.capacity;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -205,4 +288,6 @@ export const handlers: Record<SimNodeType, NodeHandler> = {
   splitter: handleSplitter,
   elevator: handleElevator,
   ramp: handleRamp,
+  gate: handleGate,
+  bucket: handleBucket,
 };

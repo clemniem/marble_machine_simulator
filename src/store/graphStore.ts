@@ -31,6 +31,7 @@ import type {
   SimNodeType,
   SimEdge,
   ValidationResult,
+  GateCondition,
 } from '../simulation/types.js';
 import { DEFAULT_MARBLE_SPEED, DEFAULT_SPAWN_RATE, TICK_RATE } from '../lib/constants.js';
 
@@ -140,6 +141,26 @@ function rfNodeToSimNode(rfNode: RFNode): SimNode {
       };
     case 'ramp':
       return { ...base, type: 'ramp' };
+    case 'gate': {
+      const condition = rfNode.data?.condition;
+      return {
+        ...base,
+        type: 'gate',
+        condition: (condition && typeof condition === 'object' && 'kind' in condition)
+          ? condition as GateCondition
+          : { kind: 'tickInterval' as const, period: 60 },
+        isOpen: false,
+        heldMarbles: [],
+      };
+    }
+    case 'bucket':
+      return {
+        ...base,
+        type: 'bucket',
+        capacity: (rfNode.data?.capacity as number) ?? 5,
+        currentFill: 0,
+        releaseMode: (rfNode.data?.releaseMode as 'all' | 'overflow') ?? 'all',
+      };
     default:
       return { ...base, type: 'ramp' };
   }

@@ -7,6 +7,8 @@ const NODE_TYPES: Array<{ type: SimNodeType; label: string; color: string }> = [
   { type: 'splitter', label: 'Splitter', color: '#a855f7' },
   { type: 'elevator', label: 'Elevator', color: '#3b82f6' },
   { type: 'ramp', label: 'Ramp', color: '#f59e0b' },
+  { type: 'gate', label: 'Gate', color: '#6b7280' },
+  { type: 'bucket', label: 'Bucket', color: '#0ea5e9' },
 ];
 
 export default function NodePalette() {

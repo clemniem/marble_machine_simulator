@@ -21,6 +21,8 @@ import type {
   SplitterNode,
   ElevatorNode,
   RampNode,
+  GateNode,
+  BucketNode,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -98,6 +100,22 @@ export function createNode<T extends SimNodeType>(
       id,
       type: 'ramp' as const,
       position,
+    }),
+    gate: () => ({
+      id,
+      type: 'gate' as const,
+      position,
+      condition: { kind: 'tickInterval' as const, period: 60 },
+      isOpen: false,
+      heldMarbles: [],
+    }),
+    bucket: () => ({
+      id,
+      type: 'bucket' as const,
+      position,
+      capacity: 5,
+      currentFill: 0,
+      releaseMode: 'all' as const,
     }),
   };
 

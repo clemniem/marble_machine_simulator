@@ -62,12 +62,54 @@ export const RampNodeSchema = z.object({
   position: PositionSchema,
 });
 
+// Gate condition — discriminated union on `kind`
+const MarbleCountConditionSchema = z.object({
+  kind: z.literal('marbleCount'),
+  threshold: z.number().int().positive(),
+  arrivedCount: z.number().int().nonnegative(),
+});
+
+const TickIntervalConditionSchema = z.object({
+  kind: z.literal('tickInterval'),
+  period: z.number().int().positive(),
+});
+
+const ManualConditionSchema = z.object({
+  kind: z.literal('manual'),
+});
+
+export const GateConditionSchema = z.discriminatedUnion('kind', [
+  MarbleCountConditionSchema,
+  TickIntervalConditionSchema,
+  ManualConditionSchema,
+]);
+
+export const GateNodeSchema = z.object({
+  id: z.string(),
+  type: z.literal('gate'),
+  position: PositionSchema,
+  condition: GateConditionSchema,
+  isOpen: z.boolean(),
+  heldMarbles: z.array(z.string()),
+});
+
+export const BucketNodeSchema = z.object({
+  id: z.string(),
+  type: z.literal('bucket'),
+  position: PositionSchema,
+  capacity: z.number().int().positive(),
+  currentFill: z.number().int().nonnegative(),
+  releaseMode: z.union([z.literal('all'), z.literal('overflow')]),
+});
+
 export const SimNodeSchema = z.discriminatedUnion('type', [
   SourceNodeSchema,
   SinkNodeSchema,
   SplitterNodeSchema,
   ElevatorNodeSchema,
   RampNodeSchema,
+  GateNodeSchema,
+  BucketNodeSchema,
 ]);
 
 // ---------------------------------------------------------------------------

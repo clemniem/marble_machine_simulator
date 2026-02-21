@@ -32,7 +32,9 @@ export type SimNodeType =
   | 'sink'
   | 'splitter'
   | 'elevator'
-  | 'ramp';
+  | 'ramp'
+  | 'gate'
+  | 'bucket';
 
 /** Fields shared by every simulation node. */
 export interface SimNodeBase {
@@ -81,13 +83,58 @@ export interface RampNode extends SimNodeBase {
   readonly type: 'ramp';
 }
 
+// ---------------------------------------------------------------------------
+// Gate — conditional pass/block
+// ---------------------------------------------------------------------------
+
+export type GateConditionKind = 'marbleCount' | 'tickInterval' | 'manual';
+
+export interface MarbleCountCondition {
+  readonly kind: 'marbleCount';
+  readonly threshold: number;
+  arrivedCount: number;
+}
+
+export interface TickIntervalCondition {
+  readonly kind: 'tickInterval';
+  readonly period: number;
+}
+
+export interface ManualCondition {
+  readonly kind: 'manual';
+}
+
+export type GateCondition = MarbleCountCondition | TickIntervalCondition | ManualCondition;
+
+export interface GateNode extends SimNodeBase {
+  readonly type: 'gate';
+  condition: GateCondition;
+  isOpen: boolean;
+  heldMarbles: MarbleId[];
+}
+
+// ---------------------------------------------------------------------------
+// Bucket — fill-based container
+// ---------------------------------------------------------------------------
+
+export type BucketReleaseMode = 'all' | 'overflow';
+
+export interface BucketNode extends SimNodeBase {
+  readonly type: 'bucket';
+  readonly capacity: number;
+  currentFill: number;
+  readonly releaseMode: BucketReleaseMode;
+}
+
 /** Discriminated union of all simulation node types. */
 export type SimNode =
   | SourceNode
   | SinkNode
   | SplitterNode
   | ElevatorNode
-  | RampNode;
+  | RampNode
+  | GateNode
+  | BucketNode;
 
 // ---------------------------------------------------------------------------
 // Edges
