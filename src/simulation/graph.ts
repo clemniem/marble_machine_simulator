@@ -6,7 +6,7 @@
  */
 
 import { distance } from '../lib/math.js';
-import { DEFAULT_MARBLE_SPEED, DEFAULT_SPAWN_RATE, TICK_RATE } from '../lib/constants.js';
+import { DEFAULT_SPAWN_RATE, TICK_RATE } from '../lib/constants.js';
 import type {
   NodeId,
   EdgeId,
@@ -16,13 +16,6 @@ import type {
   SimEdge,
   SimGraph,
   ValidationResult,
-  SourceNode,
-  SinkNode,
-  SplitterNode,
-  ElevatorNode,
-  RampNode,
-  GateNode,
-  BucketNode,
 } from './types.js';
 
 // ---------------------------------------------------------------------------

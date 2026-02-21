@@ -4,7 +4,7 @@ import {
   Background,
   Controls,
   type Connection,
-  type IsValidConnection,
+  type Edge,
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -30,8 +30,8 @@ export default function FlowEditor() {
   const validate = useGraphStore((s) => s.validate);
   const addNode = useGraphStore((s) => s.addNode);
 
-  const isValidConnection: IsValidConnection = useCallback(
-    (connection: Connection) => {
+  const isValidConnection = useCallback(
+    (connection: Edge | Connection) => {
       if (connection.source === connection.target) return false;
 
       const { edges: currentEdges } = useGraphStore.getState();

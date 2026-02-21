@@ -33,7 +33,7 @@ import type {
   ValidationResult,
   GateCondition,
 } from '../simulation/types.js';
-import { DEFAULT_MARBLE_SPEED, DEFAULT_SPAWN_RATE, TICK_RATE } from '../lib/constants.js';
+import { DEFAULT_SPAWN_RATE, TICK_RATE } from '../lib/constants.js';
 
 // ---------------------------------------------------------------------------
 // LocalStorage helpers
